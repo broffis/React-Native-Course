@@ -1,12 +1,24 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 // import { Route, Router } from "@react-navigation/native";
-import { FunctionComponent, useContext, useLayoutEffect } from "react";
+import {
+  FunctionComponent,
+  useContext,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { IconButton } from "../components/UI/IconButton";
 import { GlobalStyles } from "../constants/styles";
-import { Button } from "../components/UI/Button";
 import { NavigationProp } from "@react-navigation/native";
 import { ExpensesContext } from "../store/expenses-context";
-import { Expense, NewExpense } from "../constants/types";
+import { ExpenseData } from "../constants/types";
+import { ExpenseForm } from "../components/ManageExpense/ExpenseForm";
+import {
+  storeExpense,
+  updateExpense as axiosUpdateExpense,
+  deleteExpense as axiosDeleteExpense,
+} from "../utils/http";
+import { LoadingOverlay } from "../components/UI/LoadingOverlay";
+import { ErrorOverlay } from "../components/UI/ErrorOverlay";
 
 type ExpenseRoute = {
   routeName: string;
@@ -25,33 +37,47 @@ export const ManageExpense: FunctionComponent<ManageExpenseProps> = ({
   route,
   navigation,
 }) => {
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
   const { expenseId } = route.params || {};
   const isEditing = !!expenseId;
 
   const { expenses, deleteExpense, addExpense, updateExpense } =
     useContext(ExpensesContext);
 
-  const deleteExpenseHandler = () => {
-    deleteExpense(expenseId);
-    navigation.goBack();
+  const selectedExpense = expenses.find((e) => e.id === expenseId);
+
+  const deleteExpenseHandler = async () => {
+    setIsSubmitting(true);
+    try {
+      await axiosDeleteExpense(expenseId);
+      deleteExpense(expenseId);
+      navigation.goBack();
+    } catch (error) {
+      setError("Could not delete expense. Please try again later");
+      setIsSubmitting(false);
+    }
   };
+
   const cancelHandler = () => {
     navigation.goBack();
   };
-  const confirmHandler = () => {
-    if (isEditing) {
-      updateExpense(expenseId, {
-        description: "Test!!!!!!!",
-        amount: 19.99,
-        date: new Date("2023-05-18"),
-      });
-    } else {
-      addExpense({
-        description: "Test",
-        amount: 19.99,
-        date: new Date("2023-05-19"),
-      });
+
+  const confirmHandler = async (expenseData: ExpenseData) => {
+    setIsSubmitting(true);
+    try {
+      if (isEditing) {
+        updateExpense(expenseId, expenseData);
+        await axiosUpdateExpense(expenseId, expenseData);
+      } else {
+        const id = await storeExpense(expenseData);
+        addExpense({ ...expenseData, id });
+      }
+    } catch (error) {
+      setError("Could not save expense. Please try again later");
+      setIsSubmitting(false);
     }
+
     navigation.goBack();
   };
 
@@ -61,16 +87,22 @@ export const ManageExpense: FunctionComponent<ManageExpenseProps> = ({
     });
   }, [navigation, isEditing]);
 
+  const errorHandler = () => {
+    setError("");
+  };
+
+  if (error && !isSubmitting)
+    return <ErrorOverlay message={error} onConfirm={errorHandler} />;
+  if (isSubmitting) return <LoadingOverlay />;
+
   return (
     <View style={styles.container}>
-      <View style={styles.buttons}>
-        <Button mode="flat" onPress={cancelHandler} style={styles.button}>
-          Cancel
-        </Button>
-        <Button onPress={confirmHandler} style={styles.button}>
-          {isEditing ? "Update" : "Add"}
-        </Button>
-      </View>
+      <ExpenseForm
+        onCancel={cancelHandler}
+        onSubmit={confirmHandler}
+        submitBUttonLabel={isEditing ? "Update" : "Add"}
+        defaultValue={selectedExpense}
+      />
       {isEditing && (
         <View style={styles.deleteContainer}>
           <IconButton
@@ -96,15 +128,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 2,
     borderTopColor: GlobalStyles.colors.primary200,
-    alignItems: "center",
-  },
-  button: {
-    minWidth: 120,
-    marginHorizontal: 8,
-  },
-  buttons: {
-    flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
   },
 });

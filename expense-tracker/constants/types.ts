@@ -6,3 +6,9 @@ export type Expense = {
 };
 
 export type NewExpense = Omit<Expense, "id">;
+
+export type ExpenseData = {
+  amount: number;
+  date: Date;
+  description: string;
+};
