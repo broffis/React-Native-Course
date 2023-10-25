@@ -16,7 +16,6 @@ type FirebaseExpenseResponse = {
 export const storeExpense = async (
   expenseData: ExpenseData
 ): Promise<string> => {
-  console.log("FIREBASE_URL", FIREBASE_URL);
   const response = await axios.post<FirebaseExpenseResponse>(
     `${FIREBASE_URL}/expenses.json`,
     expenseData
@@ -26,7 +25,6 @@ export const storeExpense = async (
 };
 
 export const fetchExpenses = async (): Promise<Expense[]> => {
-  console.log("FIREBASE_URL", FIREBASE_URL);
   const response = await axios.get<Expense[]>(`${FIREBASE_URL}/expenses.json`);
 
   const expenses = [];
